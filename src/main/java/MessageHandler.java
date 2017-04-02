@@ -1,8 +1,8 @@
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+
 /**
- * Created by evgeniyh on 22/03/17.
+ * Created by evgeniyh on 02/04/17.
  */
-public class MessageHandler {
-    void handleMessage(String topic, String message) {
-//        TODO: send to DB
-    }
+public interface MessageHandler extends AutoCloseable {
+    void handle(ConsumerRecords<String, String> records);
 }

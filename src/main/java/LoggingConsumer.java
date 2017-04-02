@@ -1,15 +1,10 @@
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.log4j.Logger;
-import org.json.JSONObject;
 
-import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
-import java.net.Socket;
 import java.util.Collection;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -25,12 +20,12 @@ public class LoggingConsumer implements AutoCloseable {
     private boolean closed;
 
     public LoggingConsumer() {
-        Properties prop = PropertiesLoader.loadProperties(PropertiesLoader.CONSUMER_DEV);
+        Properties prop = Utils.loadProperties(Utils.CONSUMER_DEV);
         prop.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         consumer = new KafkaConsumer<>(prop);
     }
 
-    public void start(String logstashIp, int logstashPort) {
+    public void start(MessageHandler messageHandler) {
         validateCanBeStarted();
         activated = true;
         logger.info("Registering to all of the topics");
@@ -39,27 +34,10 @@ public class LoggingConsumer implements AutoCloseable {
         ConsumerRecords<String, String> records;
         while (!closed) {
             records = consumer.poll(100);
-            if (records.isEmpty()) {
-                continue;
-            }
-            try (Socket socket = new Socket(logstashIp, logstashPort);
-                 DataOutputStream os = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()))) {
-                for (ConsumerRecord<String, String> record : records) {
-                    String jsonString = createJson(record.topic(), record.value(), record.timestamp());
-                    os.writeBytes(jsonString + "\n");
-                    System.out.println("Sending message" + jsonString);
-                }
-            } catch (Exception e) {
-
+            if (!records.isEmpty()) {
+                messageHandler.handle(records);
             }
         }
-    }
-
-    private String createJson(String topic, String value, long timestamp) {
-        return new JSONObject()
-                .put("Topic", topic)
-                .put("Message", value)
-                .put("Timestamp", String.valueOf(timestamp)).toString();
     }
 
     private void validateCanBeStarted() {
