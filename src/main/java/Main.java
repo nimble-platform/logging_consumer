@@ -4,27 +4,44 @@ import net.sourceforge.argparse4j.inf.ArgumentParserException;
 import net.sourceforge.argparse4j.inf.Namespace;
 import net.sourceforge.argparse4j.inf.Subparser;
 import net.sourceforge.argparse4j.inf.Subparsers;
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Logger;
+import org.apache.log4j.varia.NullAppender;
+
+import java.io.IOException;
 
 /**
  * Created by evgeniyh on 22/03/17.
  */
 public class Main {
+    private static Logger logger;
+
+    private static LoggingConsumer consumer;
+
     //    TODO: maybe add object store storage
     public static void main(String[] args) {
+        Logger.getRootLogger().addAppender(new NullAppender());
+        logger = Logger.getLogger(Main.class);
+
+        BasicConfigurator.configure();
         ArgumentParser parser = getParser();
-        try (LoggingConsumer consumer = new LoggingConsumer()) {
+        try {
             Namespace namespace = parser.parseArgs(args);
             MessageHandler messageHandler = getMessageHandler(namespace);
+            consumer = new LoggingConsumer();
             consumer.start(messageHandler);
         } catch (ArgumentParserException ex) {
             parser.handleError(ex);
         } catch (Exception ex) {
-            System.out.println("Exiting");
-            ex.printStackTrace();
+            logger.error("Error in logging consumer", ex);
+        } finally {
+            if (consumer != null) {
+                consumer.close();
+            }
         }
     }
 
-    private static MessageHandler getMessageHandler(Namespace namespace) {
+    private static MessageHandler getMessageHandler(Namespace namespace) throws IOException {
         String loggingType = namespace.getString("command");
         switch (loggingType) {
             case ("file"):
@@ -33,7 +50,11 @@ public class Main {
             case ("logstash"):
                 String host = namespace.getString("host");
                 int port = namespace.getInt("port");
-                return new LogstashMessageHandler(host, port);
+                if (Utils.isServerUp(host, port)) {
+                    return new LogstashMessageHandler(host, port);
+                } else {
+                    throw new RuntimeException("Logstash server seems to be unreachable");
+                }
             default:
                 throw new IllegalArgumentException(loggingType + "Isn't supported");
         }

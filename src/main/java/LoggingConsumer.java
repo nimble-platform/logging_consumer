@@ -5,8 +5,10 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.log4j.Logger;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -22,7 +24,12 @@ public class LoggingConsumer implements AutoCloseable {
     public LoggingConsumer() {
         Properties prop = Utils.loadProperties(Utils.CONSUMER_DEV);
         prop.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-        consumer = new KafkaConsumer<>(prop);
+        String[] servers = prop.getProperty("bootstrap.servers").split(",");
+        if (Arrays.stream(servers).anyMatch(Utils::isServerUp)) {
+            consumer = new KafkaConsumer<>(prop);
+        } else {
+            throw new RuntimeException("Can't connect to any of the kafka bootstrap servers");
+        }
     }
 
     public void start(MessageHandler messageHandler) {

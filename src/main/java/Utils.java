@@ -2,7 +2,9 @@ import org.apache.log4j.Logger;
 import org.json.JSONObject;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.Socket;
 import java.util.Properties;
 
 /**
@@ -41,5 +43,18 @@ public class Utils {
                 .put("Topic", topic)
                 .put("Message", value)
                 .put("Timestamp", String.valueOf(timestamp)).toString();
+    }
+
+    public static boolean isServerUp(String connectionString) {
+        String[] values = connectionString.split(":");
+        return isServerUp(values[0], Integer.valueOf(values[1]));
+    }
+
+    public static boolean isServerUp(String hostname, int port) {
+        try (Socket s = new Socket(hostname, port)) {
+            return s.isConnected();
+        } catch (IOException ex) {
+            return false;
+        }
     }
 }
